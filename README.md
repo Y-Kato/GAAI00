@@ -1,3 +1,6 @@
+![CI](https://github.com/Y-Kato/GAAI00/actions/workflows/main.yml/badge.svg)
+![License](https://img.shields.io/github/license/Y-Kato/GAAI00)
+![Last Commit](https://img.shields.io/github/last-commit/Y-Kato/GAAI00)
 # LlamaIndex + LangChain Dev Assistant Stack (Docker-Compose)
 
 このリポジトリは、LlamaIndex と LangChain を活用しソースコードベースの**開発支援・保守支援**を目的とした Docker 構成です。
@@ -32,6 +35,8 @@ project-root/
 │  ├─ watcher.py
 │  ├─ prompts.py
 │  └─ utils.py
+├─ .github/workflows/
+│  └─ main.yml
 └─ chroma_data/              ← 自動生成される永続ボリューム領域
 ```
 

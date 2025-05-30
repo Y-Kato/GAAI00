@@ -10,6 +10,9 @@ GAAI00/
 │   ├── Dockerfile
 │   └── run.sh
 │
+├── .github/workflows
+│   └── main.yml             # CI
+│
 ├── chroma_data/             # Chroma のベクトルストア（Docker Volume）→ .gitignore
 ├── .env.example             # サンプル環境設定（← .env は無視）
 ├── docker-compose.yml
@@ -51,7 +54,7 @@ Thumbs.db
 # Git ロード
 .git/
 .gitignore
-.github/
+.github/ISSUE_TEMPLATE/
 
 # Docker 実行データ
 chroma_data/
