@@ -30,4 +30,10 @@ jobs:
           python -m compileall .
 
       - name: Docker Compose build
-        run: docker compose -f docker-compose.yml build
+        env:
+          PROJECT_PATH: ./sample_project
+          PROJECT_DIR: /workspace/project
+          OPENAI_API_KEY: dummy-key
+        run: |
+          mkdir -p sample_project
+          docker compose -f docker-compose.yml build
