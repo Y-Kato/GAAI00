@@ -1,0 +1,28 @@
+# 環境変数などの機密情報
+.env
+*.env
+
+# Pythonのキャッシュ・一時ファイル
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# OS・エディタによるメタファイル
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# GitやCI関連ファイル（ビルドには不要）
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# 永続データやボリュームマウント先
+chroma_data/
+
+# 他の docker 構成ファイル（必要に応じて）
+docker-compose.override.yml

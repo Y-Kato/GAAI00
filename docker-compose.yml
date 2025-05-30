@@ -1,0 +1,39 @@
+version: "3.9"
+
+x-env-common: &env_common
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  PROJECT_DIR: /workspace/project
+  CHROMA_URL: http://chroma:8000
+  UI_MODE: ${UI_MODE:-streamlit}
+
+services:
+  chroma:
+    # 0.5.1 → 0.4.24 へダウングレード
+    image: ghcr.io/chroma-core/chroma:0.4.24
+    container_name: chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+    volumes:
+      - chroma_data:/chroma-data
+    ports:
+    - "8000:8000"
+
+  app:
+    build: ./app
+    container_name: llc-app
+    env_file: .env
+    environment:
+      <<: *env_common
+    volumes:
+      - ./app:/app
+      - ${PROJECT_PATH}:${PROJECT_DIR}:ro
+      - chroma_data:/chroma-data
+    depends_on:
+      - chroma
+    command: ["bash", "run.sh"]
+    ports:
+      - "8501:8501"   # Streamlit
+      - "7860:7860"   # Gradio
+
+volumes:
+  chroma_data:
