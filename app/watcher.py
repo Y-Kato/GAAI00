@@ -3,7 +3,7 @@ from time import sleep
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from utils import PROJECT_DIR
+from config import PROJECT_DIR, WATCH_INTERVAL_SEC
 from indexer import incremental_update
 
 class Handler(FileSystemEventHandler):
@@ -18,7 +18,7 @@ observer.start()
 
 try:
     while True:
-        sleep(1)
+        sleep(WATCH_INTERVAL_SEC)
 except KeyboardInterrupt:
     observer.stop()
 observer.join()

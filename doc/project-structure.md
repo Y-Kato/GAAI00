@@ -1,116 +1,66 @@
-# GAAI00 開発支援スタック：リポジトリ設計方針
+# Project Structure & Conventions
 
-## ディレクトリ構成の方針
+> **All configuration flows through `.env → config.py`**. Hard‑coded values are treated as bugs.
 
 ```
 GAAI00/
-├── app/                     # 全アプリケーションロジック（Python）
-│   ├── *.py                 # 各種モジュール：UI, indexer, git, etc.
-│   ├── requirements.txt     # Python依存
+├── app/
+│   ├── config.py        # central .env resolver
+│   ├── ui_streamlit.py  # ↳ UI entry (streamlit)
+│   ├── ui_gradio.py     # ↳ UI entry (gradio)
+│   ├── indexer.py       # builds/updates Chroma
+│   ├── watcher.py       # inotify incremental watcher
+│   ├── git_utils.py     # Git history & blame helpers
 │   ├── Dockerfile
-│   └── run.sh
+│   └── run.sh           # boot script (env → config → watcher → UI)
 │
-├── .github/workflows
-│   └── main.yml             # CI
-│
-├── chroma_data/             # Chroma のベクトルストア（Docker Volume）→ .gitignore
-├── .env.example             # サンプル環境設定（← .env は無視）
-├── docker-compose.yml
-├── README.md
-├── LICENSE
-├── .dockerignore
-├── .gitignore
-└── docs/                    # 任意：設計図、構成図、チュートリアル
+├── docker-compose.yml   # single-node stack (app + chroma)
+├── .env.example         # **canonical list of variables**
+├── chroma_data/         # Chroma persistence (bind‑mount)
+├── docs/                # this folder
+└── etc/
 ```
 
 ---
 
-## Git管理ポリシー
+## Mandatory Conventions
 
-### Gitに含めるべきファイル
+1. **No direct `os.getenv()` outside `config.py`.**
+   Import `from app.config import cfg` and read from `cfg.CHROMA_URL`, etc.
+2. **All new variables → `.env.example` → `config.py`.**
+   PR fails if CI detects missing keys.
+3. **Generated assets** (`chroma_data`, `*.log`) must be excluded via `.gitignore`.
 
-* `.env.example`
-* `app/*.py`, `Dockerfile`, `run.sh`, `requirements.txt`
-* `README.md`, `LICENSE`, `.gitignore`, `.dockerignore`
-* `docker-compose.yml`
+---
 
-### Gitに含めない（`.gitignore`登録）
+## `config.py` Anatomy (excerpt)
 
-```
-# 環境情報
-.env
-*.env
+```python
+from pathlib import Path
+from pydantic import BaseSettings
 
-# Python キャッシュ
-__pycache__/
-*.py[cod]
+class Settings(BaseSettings):
+    CHROMA_HOST: str = "chroma"
+    PORT_CHROMA: int = 8000
+    # ... other fields ...
 
-# OS / IDE
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
+    @property
+    def CHROMA_URL(self):
+        return f"http://{self.CHROMA_HOST}:{self.PORT_CHROMA}"
 
-# Git ロード
-.git/
-.gitignore
-.github/ISSUE_TEMPLATE/
-
-# Docker 実行データ
-chroma_data/
-app/.last_indexed_commit
+cfg = Settings(_env_file=".env", _env_file_encoding="utf-8")
 ```
 
----
+This pattern guarantees:
 
-## 運用フロー
-
-### ローカル開発
-
-* `.env` でローカルプロジェクトをマウント
-* `docker compose up --build` で簡単起動
-* Gitと連携して更新を自動検知
-
-### リリース（メモ・案）
-
-* `main` へのマージ時に `v0.x.x` タグ付与
-* `CHANGELOG.md` に詳細書く
-
-### コントリビュート方針（メモ・案）
-
-* `feature/xxx` や `fix/xxx` ブランチ
-* PR時は、Dockerで実行確認必須
-* LLM関係ならスクショも添付
+* Single import cost
+* Auto‑completion & type safety
+* Late evaluation (overridden easily in tests)
 
 ---
 
-## docs/ 構成案
+## Git Policy
 
-| ファイル                 | 内容                      |
-| -------------------- | ----------------------- |
-| `architecture.md`    | 構成図 & モジュール分析           |
-| `usage.md`           | .env設定やチュートリアル          |
-| `extend.md`          | LangChain Agent などの拡張方法 |
-| `troubleshooting.md` | よくあるエラー対処               |
-
----
-
-## バージョン管理戦略（メモ・案）
-
-* `v0.1.0` 最小構成コンプリート
-* `v0.2.0` LangChain Agent 対応
-* `v1.0.0` 穩定分岐
-
----
-
-## 拡張性を前提とした設計（メモ・案）
-
-| 拡張要素         | 現状               | 拡張例                            |
-| ------------ | ---------------- | ------------------------------ |
-| Vector Store | Chroma           | Qdrant, FAISS, Weaviate など     |
-| LLM          | OpenAI固定         | HuggingFace, Local(LLaMA.cpp等) |
-| Prompt定義     | Python内に固定       | YAMLまたはUIで編集可能に                |
-| UI           | Gradio/Streamlit | Next.js, REST APIへ分離構成         |
-| 自動評価・ログ      | 未導入              | LangSmith や GitHub Actions 連携  |
-
-
+* **feature/<name>** → PR → main
+* Doc updates belong in the same PR as code changes that introduce new env vars.
+* CI enforces `docs/project-structure.md` checksum to notice silent drifts.

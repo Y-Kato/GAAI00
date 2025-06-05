@@ -1,113 +1,150 @@
 ![CI](https://github.com/Y-Kato/GAAI00/actions/workflows/main.yml/badge.svg)
 ![License](https://img.shields.io/github/license/Y-Kato/GAAI00)
 ![Last Commit](https://img.shields.io/github/last-commit/Y-Kato/GAAI00)
-# LlamaIndex + LangChain Dev Assistant Stack (Docker-Compose)
 
-このリポジトリは、LlamaIndex と LangChain を活用しソースコードベースの**開発支援・保守支援**を目的とした Docker 構成です。
-Gradio/StreamlitベースのチャットUIを通じて、コードのリファクタ提案、Git履歴に基づくメタ情報の付与、変更の自動検出と再インデックスなど、開発に役立つ基本的な機能が統合された素体として構成されています。
+# LlamaIndex + LangChain Dev‑Assistant Stack (Docker Compose)
 
----
-
-## 特徴
-
-・ **LlamaIndex + LangChain** による自然言語対話型のコードリファクタ提案
-・ **Git履歴を活用したメタデータ付与**
-・ **ソース変更の自動検知 & 増分インデックス更新**
-・ **Chroma による永続ベクトルストア構成**
-・ **Gradio / Streamlit UI（選択可能）**
-・ **完全Docker化** により、簡単かつ再現可能な開発環境構築
+> 🦙🔗 **コード解析・リファクタ支援 ＆ マルチプロジェクト対応のポータブル環境**
+>
+> ⚠️ **このスタックは構築中の素体です。LangChain の Agent 化や Tool 呼び出しの導入は今後の拡張対象であり、現時点では主にインデックス構築と検索支援に特化しています。**
+>
+> 本スタックは *LlamaIndex* と *LangChain* を中心に、Git 履歴・ソースツリーから得られる情報を組み合わせて開発を支援する AI ツールチェーンです。Docker 1 コマンドで起動でき、Streamlit / Gradio UI を選択可能。増分インデックス更新や永続型ベクトルストア (Chroma) を含みます。
 
 ---
 
-## ディレクトリ構成
+## ✨ 主なポイント
 
-```
-project-root/
-├─ docker-compose.yml
-├─ .env.example              ← 環境に合わせて編集
-├─ app/
-│  ├─ Dockerfile
-│  ├─ requirements.txt
-│  ├─ run.sh
-│  ├─ main.py
-│  ├─ indexer.py
-│  ├─ git_metadata.py
-│  ├─ watcher.py
-│  ├─ prompts.py
-│  └─ utils.py
-├─ .github/workflows/
-│  └─ main.yml
-└─ chroma_data/              ← 自動生成される永続ボリューム領域
-```
+| 機能                           | 説明                                                             |
+| ------------------------------ | ---------------------------------------------------------------- |
+| **🗄️ Chroma + LlamaIndex**  | 永続ベクトルストアで巨大リポジトリも高速検索／RAG 拡張が容易     |
+| **🔍 Git メタデータ連携**     | コミット履歴を取得し文脈に沿った提案を生成                       |
+| **🚀 動的環境構築 run.sh**    | ビルド最小化・即時スクリプト反映・本番／開発切替に対応           |
+| **♻️ 変更検知ウォッチャ**    | ファイル変更を自動検出しインデックスを部分再構築                 |
+| **📜 .env + config.py**       | *すべての設定値は .env に統一し*、**`config.py` 経由でのみ参照** |
+| **🪄 マルチプロジェクト拡張** | `.env.*` と複数 app サービスを並列にするだけで複数リポジトリ対応 |
 
 ---
 
-## セットアップ方法
+## 🔭 将来的な構想
 
-### 1. `.env` ファイルの準備
+このスタックは以下の方向性で拡張を予定しています：
 
-```bash
-cp .env.example .env
+| 拡張項目             | 内容                                                                      |
+| -------------------- | ------------------------------------------------------------------------- |
+| LangChain Agent 導入 | `ReActAgent` や `ToolAgent` による対話的コード解析                        |
+| Git 自動分析         | コミット履歴や blame 情報からバグ傾向・責任範囲を推論                     |
+| Tool 呼び出し連携    | `flake8`, `mypy`, `gitleaks` など Linter/CLI を LangChain Tool 経由で実行 |
+| コード提案・修正     | AI による修正提案（patch 生成）と Git 操作の自動化支援                    |
+| 条件分岐型プロンプト | 複数 Tool を連携させるマルチステップ推論・状況判断処理                    |
+
+これらは段階的に module 分離された形で追加予定です。Issue/Pull Request も歓迎します。
+
+---
+
+## 📂 ディレクトリ構成
+
+```text
+GAAI00/
+├── app/                    # Python ロジック
+│   ├── config.py          # .env 変数を一元解決
+│   ├── *.py               # UI, indexer, git, watcher, prompts
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── run.sh
+│
+├── .env.example           # すべてのキーとデフォルトを提示
+├── docker-compose.yml
+├── chroma_data/           # ← 自動生成・Git 管理外
+├── docs/
+└── etc.
 ```
 
-環境に合わせて編集：
+> **NOTE** : 旧 `utils.py` は **`config.py` に統合** されました。
+
+---
+
+## ⚙️ 環境変数一覧 (.env)
+
+| 変数                | 役割                                              | 例                 | 旧版との差分         |
+| ------------------- | ------------------------------------------------- | ------------------ | -------------------- |
+| `CHROMA_HOST`       | Chroma サーバホスト (Docker 内)                   | chroma             | **New**              |
+| `PORT_CHROMA`       | Chroma ポート                                     | 8000               | **New**              |
+| `CHROMA_URL`        | 自動生成 (`http://${CHROMA_HOST}:${PORT_CHROMA}`) | –                  | –                    |
+| `CHROMA_DATA_DIR`   | Chroma 永続データパス (Container)                 | /chroma-data       | **New**              |
+| `CHROMA_COLLECTION` | コレクション名                                    | source-code        | ↗︎ 旧 README 未記載 |
+| `PROJECT_PATH`      | ホスト側プロジェクトパス                          | /home/user/myproj  | same                 |
+| `PROJECT_DIR`       | コンテナ内マウント先                              | /workspace/project | same                 |
+| `OPENAI_API_KEY`    | LLM API キー                                      | sk-...             | same                 |
+| `UI_MODE`           | `streamlit` / `gradio`                            | streamlit          | same                 |
+| `PORT_STREAMLIT`    | 外部公開ポート                                    | 8501               | **New**              |
+| `PORT_GRADIO`       | 外部公開ポート                                    | 7860               | **New**              |
+
+### .env サンプル
 
 ```dotenv
-PROJECT_PATH=/path/to/your/project    # 自分のソースコードの符合パスに変更
-PROJECT_DIR=/workspace/project        # Dockerコンテナ内部でプロジェクトがマウントされるパス
-OPENAI_API_KEY=sk-***your-api-key***  # OpenAI API キーをここに記入（公開前に削除）
-UI_MODE=streamlit                     # または gradio
+# Chroma
+CHROMA_HOST=chroma
+PORT_CHROMA=8000
+CHROMA_DATA_DIR=/chroma-data
+CHROMA_COLLECTION=source-code
+
+# Ports
+PORT_STREAMLIT=8501
+PORT_GRADIO=7860
+
+# Project mount
+PROJECT_PATH=/home/user/myproject
+PROJECT_DIR=/workspace/project
+
+# LLM
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
+
+# UI
+UI_MODE=streamlit
 ```
 
-### 2. Dockerビルドと起動
+> `.env.example` をコピーして編集してください。CI で欠損チェックが走ります。
+
+---
+
+## 🏗️ セットアップ
 
 ```bash
+# 1. 環境変数を用意
+cp .env.example .env
+vi .env  # ← 必要箇所を変更
+
+# 2. 起動
 docker compose up --build
 ```
 
-起動後、以下のURLからアクセス：
+* **初回起動** : `PROJECT_PATH` 全体をインデックス
+* **次回以降** : 変更差分のみを自動インデックス
+* UI URL :
 
-* Streamlit: [http://localhost:8501](http://localhost:8501)
-* Gradio: [http://localhost:7860](http://localhost:7860)
-
----
-
-## 初回実行時の動作
-
-初回起動時に、指定された`PROJECT_PATH`内のすべてのファイルを全文インデックス化します。
-以降は、ファイル変更やGitコミットに応じて自動的に差分のみを再インデックスします。
+  * Streamlit → `http://localhost:${PORT_STREAMLIT}`
+  * Gradio   → `http://localhost:${PORT_GRADIO}`
 
 ---
 
-## チャットでできること
+## 🔧 開発ヒント
 
-* ソースコードを貼り付けて改善点を問うと、LLMが **日本語で明確なリファクタ提案**を返します。
-* Git履歴も参照するため、**文脈に正しい提案**が可能です。
+* `run.sh` は *背景で `watcher.py` を起動* し、UI を選択起動します。
+* 新規定数を追加する際は **必ず `.env.example` → `config.py`** の流れで統一。
+* Python 依存 (一部更新)
 
----
-
-## 開発者向けメモ
-
-* `llama-index-core==0.10.39`
-* `langchain==0.1.14` + `langchain-community==0.0.30` ← 必須
-* `chromadb[server]==0.4.24` を使用（永続型ベクトルストア）
+  * `llama-index-embeddings-openai` ✅ *New*
+  * `llama-index-readers-file` ✅ *New*
+  * その他バージョンは `requirements.txt` を参照。
 
 ---
 
-## 公開前に確認すべきこと
+## 🤝 コントリビュート指針
 
-* `.env`に含まれる**APIキーやローカルパス**は必ず削除またはマスクしてください。
-* `project-root/app`下に**プロジェクト固有の情報**が添われていないか再確認してください。
-
----
-
-##  貢献・汎用プロジェクト
-
-この構成は拡張性があります。たとえば以下のような改良が可能です：
-
-* Retrieval-Augmented Generation (RAG)の導入
-* LangChain Agent による対話指向の改善
-* VSCode Remote Container への統合
+1. `feature/xx` ブランチで開発し PR
+2. **CI** (lint / syntax / Docker build) が緑になることを確認
+3. `.env.example`・ドキュメント更新を忘れずに
+4. Merge 後 `CHANGELOG.md` 更新 & タグ付与
 
 ---
 
@@ -122,6 +159,6 @@ docker compose up --build
 
 ---
 
-## ライセンス
+## 📄 ライセンス
 
-[MIT License](LICENSE)
+MIT License – see [LICENSE](LICENSE)

@@ -8,14 +8,13 @@ import gradio as gr
 import streamlit as st
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
-
-from utils import PROJECT_DIR
+from config import PROJECT_DIR, INDEXED_FLAG_FILE
 from indexer import build_full_index, incremental_update
 from git_metadata import commit_messages
 from prompts import REFRACTOR_PROMPT
 
 # One‑time full index if needed
-if not Path("/app/.last_indexed_commit").exists():
+if not Path(INDEXED_FLAG_FILE).exists():
     build_full_index()
 
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.2)

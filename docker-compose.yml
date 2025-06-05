@@ -1,10 +1,16 @@
 version: "3.9"
 
 x-env-common: &env_common
+  CHROMA_HOST: ${CHROMA_HOST}
+  PORT_CHROMA: ${PORT_CHROMA}
+  CHROMA_URL: http://${CHROMA_HOST}:${PORT_CHROMA}
+  PROJECT_DIR: ${PROJECT_DIR}
+  PROJECT_PATH: ${PROJECT_PATH}
+  CHROMA_DATA_DIR: ${CHROMA_DATA_DIR}
   OPENAI_API_KEY: ${OPENAI_API_KEY}
-  PROJECT_DIR: /workspace/project
-  CHROMA_URL: http://chroma:8000
-  UI_MODE: ${UI_MODE:-streamlit}
+  UI_MODE: ${UI_MODE}
+  PORT_STREAMLIT: ${PORT_STREAMLIT}
+  PORT_GRADIO: ${PORT_GRADIO}
 
 services:
   chroma:
@@ -14,9 +20,9 @@ services:
     environment:
       IS_PERSISTENT: "TRUE"
     volumes:
-      - chroma_data:/chroma-data
+      - chroma_data:${CHROMA_DATA_DIR}
     ports:
-    - "8000:8000"
+      - "${PORT_CHROMA}:${PORT_CHROMA}"
 
   app:
     build: ./app
@@ -27,13 +33,13 @@ services:
     volumes:
       - ./app:/app
       - ${PROJECT_PATH}:${PROJECT_DIR}:ro
-      - chroma_data:/chroma-data
+      - chroma_data:${CHROMA_DATA_DIR}
     depends_on:
       - chroma
     command: ["bash", "run.sh"]
     ports:
-      - "8501:8501"   # Streamlit
-      - "7860:7860"   # Gradio
+      - "${PORT_STREAMLIT}:${PORT_STREAMLIT}" # Streamlit
+      - "${PORT_GRADIO}:${PORT_GRADIO}" # Gradio
 
 volumes:
   chroma_data:

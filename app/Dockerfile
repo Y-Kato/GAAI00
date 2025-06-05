@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y git && apt-get clean
+RUN apt-get update && apt-get install -y git curl && apt-get clean
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

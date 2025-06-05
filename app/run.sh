@@ -2,7 +2,7 @@
 
 # Git リポジトリが “dubious ownership” で止まる場合読み取り専用マウントでも許可
 git config --global --add safe.directory "$PROJECT_DIR" || true
-
+echo "[run.sh] PORT_CHROMA=$PORT_CHROMA"
 set -euo pipefail
 
 # 1️⃣  Kick off background file‑watcher for incremental updates

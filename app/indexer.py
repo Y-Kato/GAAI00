@@ -1,6 +1,8 @@
 """Full & partial indexing of the mounted project into Chroma via LlamaIndex."""
 from pathlib import Path
 from typing import Sequence, List
+from urllib.parse import urlparse
+from config import PROJECT_DIR, CHROMA_COLLECTION, CHROMA_URL, CHROMA_PERSIST_DIR, INDEXED_FLAG_FILE
 
 from llama_index.core import (
     SimpleDirectoryReader,
@@ -10,16 +12,30 @@ from llama_index.core import (
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from chromadb import HttpClient
 
-from utils import PROJECT_DIR, CHROMA_COLLECTION, CHROMA_URL, CHROMA_PERSIST_DIR
-
 # --- vector store -----------------------------------------------------------
 
 def _get_vs():
-    client = HttpClient(host="chroma", port=8000)
-    return ChromaVectorStore(
-        client=client, collection_name=CHROMA_COLLECTION, persist_dir=str(CHROMA_PERSIST_DIR)
-    )
+    url = urlparse(CHROMA_URL)
+    print(f"[INDEXER] Using CHROMA_URL: {CHROMA_URL}, host: {url.hostname}, port: {url.port}")
 
+    client = HttpClient(host=url.hostname, port=url.port)
+
+    try:
+        collection = client.get_or_create_collection(name=CHROMA_COLLECTION)
+    except Exception as e:
+        if "already exists" in str(e):
+            print(f"[WARN] Collection already exists. Retrieving instead.")
+            collection = client.get_collection(name=CHROMA_COLLECTION)
+        else:
+            raise
+
+    return ChromaVectorStore(
+        chroma_collection=collection,
+        collection_name=CHROMA_COLLECTION,
+        persist_dir=str(CHROMA_PERSIST_DIR),
+        host=url.hostname,
+        port=url.port
+    )
 
 def build_full_index() -> VectorStoreIndex:
     docs = SimpleDirectoryReader(str(PROJECT_DIR)).load_data()
@@ -31,9 +47,6 @@ def build_full_index() -> VectorStoreIndex:
 # ---------------------------------------------------------------------------
 
 # 🤏 **Partial update** when a subset of files changed -----------------------
-
-INDEXED_FLAG_FILE = Path("/app/.last_indexed_commit")
-
 
 def _list_changed_files(last_commit: str) -> List[Path]:
     import git

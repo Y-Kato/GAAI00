@@ -1,7 +1,7 @@
 """Attach Git commit metadata to documents for richer retrieval."""
 from datetime import datetime
 import git
-from utils import PROJECT_DIR
+from config import PROJECT_DIR
 
 
 def commit_messages(limit: int = 100):
