@@ -1,27 +1,70 @@
-import os
+"""Central configuration management using Pydantic Settings."""
 from pathlib import Path
-from urllib.parse import urlparse
+from pydantic_settings import BaseSettings
+from llama_index.core import Settings as LlamaSettings
 
-# 環境変数ベース設定（Docker 環境想定）
-CHROMA_URL = os.environ.get("CHROMA_URL")
-url = urlparse(CHROMA_URL)
-CHROMA_HOST = url.hostname
-PORT_CHROMA = url.port
 
-PROJECT_DIR = Path(os.environ.get("PROJECT_DIR"))
-CHROMA_COLLECTION = os.environ.get("CHROMA_COLLECTION")
-CHROMA_PERSIST_DIR = Path(os.environ.get("CHROMA_DATA_DIR"))
+class Settings(BaseSettings):
+    """Environment-driven configuration with type validation."""
+    
+    # Core Chroma settings
+    CHROMA_HOST: str = "chroma"
+    PORT_CHROMA: int = 8000
+    CHROMA_DATA_DIR: str = "/chroma-data"
+    CHROMA_COLLECTION: str = "source-code"
+    
+    # Application ports
+    PORT_STREAMLIT: int = 8501
+    PORT_GRADIO: int = 7860
+    
+    # Project paths
+    PROJECT_DIR: str = "/workspace/project"
+    PROJECT_PATH: str = "/home/user/myproject"
+    
+    # LLM settings
+    OPENAI_API_KEY: str
+    EMBEDDING_PROVIDER: str = "openai"
+    UI_MODE: str = "streamlit"
 
-# 内部動作用定数
-INDEXED_FLAG_FILE = Path("/app/.last_indexed_commit")
-WATCH_INTERVAL_SEC = 1
-print(f"[CONFIG] PORT_CHROMA raw: {os.environ.get('PORT_CHROMA')!r}")
-print(f"[CONFIG] CHROMA_URL: {CHROMA_URL}")
-print(f"[CONFIG] CHROMA_HOST: {CHROMA_HOST}")
-print(f"[CONFIG] PORT_CHROMA: {PORT_CHROMA}")
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
-# モデル指定
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.core import Settings
-Settings.embed_model = OpenAIEmbedding()
-print(f"[CONFIG] Embedding model set: {Settings.embed_model}")
+    @property
+    def CHROMA_URL(self) -> str:
+        """Generate Chroma URL from host and port."""
+        return f"http://{self.CHROMA_HOST}:{self.PORT_CHROMA}"
+
+    @property
+    def CHROMA_PERSIST_DIR(self) -> Path:
+        """Chroma persistence directory as Path object."""
+        return Path(self.CHROMA_DATA_DIR)
+
+    @property
+    def INDEXED_FLAG_FILE(self) -> Path:
+        """Flag file to track last indexed commit."""
+        return Path("/app/.last_indexed_commit")
+
+    @property
+    def WATCH_INTERVAL_SEC(self) -> int:
+        """File watcher polling interval."""
+        return 1
+
+
+# Global configuration instance
+cfg = Settings()
+
+# Configure LlamaIndex embedding model (once)
+if cfg.EMBEDDING_PROVIDER.lower() == "openai":
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    LlamaSettings.embed_model = OpenAIEmbedding()
+    print(f"[CONFIG] Using OpenAIEmbedding")
+else:
+    raise ValueError(f"Unsupported EMBEDDING_PROVIDER: {cfg.EMBEDDING_PROVIDER}")
+
+# Debug output
+print(f"[CONFIG] CHROMA_URL: {cfg.CHROMA_URL}")
+print(f"[CONFIG] PROJECT_DIR: {cfg.PROJECT_DIR}")
+print(f"[CONFIG] PROJECT_PATH: {cfg.PROJECT_PATH}")
+print(f"[CONFIG] UI_MODE: {cfg.UI_MODE}")
+print(f"[CONFIG] Embedding model: {LlamaSettings.embed_model}")

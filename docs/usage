@@ -1,0 +1,537 @@
+# Usage Guide
+
+> **Version 0.2.0 – 2025‑06‑06**  
+> 完全な分離アーキテクチャ + Pydantic Settings ベース構成に刷新しました。
+
+---
+
+## 🚀 クイックスタート
+
+### 1. Prerequisites
+
+* Docker 20.10+ / docker‑compose plugin
+* GPU 不要（CPU で動作）
+* OpenAI API キー
+* 8GB+ RAM 推奨
+
+```bash
+# Docker確認
+$ docker compose version
+Docker Compose version v2.29.0
+
+# 利用可能メモリ確認
+$ docker system info | grep "Total Memory"
+Total Memory: 15.61GiB
+```
+
+---
+
+### 2. Clone & Configure
+
+```bash
+git clone https://github.com/Y-Kato/GAAI00.git
+cd GAAI00
+
+# env template → personal settings
+cp .env.example .env
+vi .env  # ← PROJECT_PATH, OPENAI_API_KEY など編集
+```
+
+**必須設定項目**:
+```dotenv
+# あなたの解析対象プロジェクトパス（絶対パス）
+PROJECT_PATH=/home/user/your-target-project
+
+# OpenAI API キー
+OPENAI_API_KEY=sk-your-actual-api-key-here
+
+# UI選択（streamlit または gradio）
+UI_MODE=streamlit
+```
+
+**オプション設定項目**:
+```dotenv
+# Chromaコレクション名（プロジェクト別に変更推奨）
+CHROMA_COLLECTION=your-project-name
+
+# ポート番号（他サービスと競合する場合）
+PORT_STREAMLIT=8501
+PORT_GRADIO=7860
+```
+
+---
+
+### 3. Build & Run
+
+```bash
+# 初回のみ: --build 付きで
+$ docker compose up --build
+
+# 成功時の出力例
+✅ Container chroma       Started
+✅ Container llc-app      Started
+
+# ログ確認
+$ docker compose logs app
+[CONFIG] CHROMA_URL: http://chroma:8000
+[CONFIG] PROJECT_DIR: /workspace/project
+[app_context] 🚀 Building initial full index...
+[app_context] ✅ Initial index built successfully
+[app_context] 🎉 Global context initialized successfully
+```
+
+**アクセス URL**:
+
+| UI        | URL                                                                        | 説明             |
+| --------- | -------------------------------------------------------------------------- | ---------------- |
+| Streamlit | [http://localhost:8501](http://localhost:8501)                            | デフォルトUI     |
+| Gradio    | [http://localhost:7860](http://localhost:7860)                            | 代替UI          |
+
+> UI は `.env` の `UI_MODE=streamlit` / `gradio` で切替え。
+
+---
+
+## 🔄 運用フロー
+
+### 初回インデックス構築
+
+初回起動時、以下の処理が自動実行されます：
+
+1. **プロジェクトスキャン**: `PROJECT_PATH` 直下の全ファイルを解析
+2. **ベクトル化**: LlamaIndex がテキストを分割してembedding化
+3. **Chroma保存**: ベクトルデータを永続ストアに格納
+4. **Git履歴取得**: コミット履歴をメタデータとして付与
+
+```bash
+# 進行状況確認
+$ docker compose logs app | grep INDEXER
+[INDEXER] 🟡 build_full_index START
+[INDEXER] 📁 PROJECT_DIR = /workspace/project
+[INDEXER] ✅ Loaded 347 documents.
+[INDEXER] 📦 Index persisted.
+```
+
+### インクリメンタル更新
+
+**自動更新**: `watcher.py` が inotify でファイル変更を検出し、差分のみを再インデックス。
+
+**手動更新**:
+```bash
+# 全体再構築
+$ docker compose exec app python -c "
+from indexer import build_full_index
+build_full_index()
+"
+
+# 増分更新のみ
+$ docker compose exec app python -c "
+from indexer import incremental_update
+incremental_update()
+"
+```
+
+### UI切り替え
+
+```bash
+# Streamlit → Gradio
+$ sed -i 's/UI_MODE=streamlit/UI_MODE=gradio/' .env
+$ docker compose restart app
+
+# 再起動後、http://localhost:7860 でアクセス可能
+```
+
+---
+
+## 💬 チャット操作方法
+
+### 基本的な使い方
+
+1. **コード貼り付け**: 改善したいコードスニペットを入力欄に貼り付け
+2. **質問入力**: 「このコードをリファクタして」「パフォーマンスを改善して」等
+3. **回答確認**: AIがGit履歴も考慮した具体的な改善提案を返答
+
+### 効果的なプロンプト例
+
+```text
+✅ 良い例:
+「このPython関数の可読性を向上させて、エラーハンドリングも追加してください」
+
+❌ 悪い例:
+「良くして」「修正して」
+```
+
+### サポートされる言語
+
+- Python, JavaScript, TypeScript
+- Java, C++, C#, Go, Rust
+- HTML, CSS, SQL
+- Markdown, YAML, JSON
+- その他テキストベースのファイル
+
+---
+
+## 🛠️ トラブルシューティング
+
+### よくある問題と解決法
+
+| 症状 | 原因 | 対策 |
+|------|------|------|
+| `ModuleNotFoundError: llama_index.embeddings.openai` | 依存パッケージの更新が必要 | `docker compose build --no-cache` |
+| UI が `404 Not Found` | `UI_MODE` と URL が不一致 | `.env` の `UI_MODE` を確認 |
+| インデックスが更新されない | `watcher.py` がクラッシュ | `docker compose logs app` でエラー確認 |
+| `OPENAI_API_KEY` エラー | API キーが無効または未設定 | `.env` のキー設定を確認 |
+| Chroma接続エラー | コンテナ間通信の問題 | `docker compose down && docker compose up` |
+
+### 詳細ログ確認
+
+```bash
+# アプリケーションログ
+$ docker compose logs app -f
+
+# Chromaログ
+$ docker compose logs chroma -f
+
+# 全体ログ
+$ docker compose logs -f
+```
+
+### リセット手順
+
+```bash
+# データ完全削除 + 再構築
+$ docker compose down -v
+$ docker volume rm gaai00_chroma_data
+$ docker compose up --build
+```
+
+---
+
+## ⚙️ 高度な設定
+
+### カスタム Embedding プロバイダー
+
+現在は OpenAI のみサポートしていますが、将来的には以下を予定：
+
+```dotenv
+# 将来サポート予定
+EMBEDDING_PROVIDER=huggingface
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+EMBEDDING_PROVIDER=azure
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+```
+
+### 検索パラメータのチューニング
+
+```bash
+# 検索結果数を調整（デフォルト: 6）
+$ docker compose exec app python -c "
+from app_context import retriever
+retriever.search_kwargs['k'] = 10  # より多くの関連コード取得
+"
+```
+
+### プロンプトテンプレートのカスタマイズ
+
+```python
+# app/prompts.py をカスタマイズ
+REFRACTOR_PROMPT = ChatPromptTemplate.from_template(
+    '''
+    あなたは熟練したソフトウェアアーキテクトです。
+    以下のコードスニペットとGit履歴を分析し、
+    具体的で実行可能なリファクタリング提案を日本語で提供してください。
+
+    ## コード
+    ```
+    {code}
+    ```
+
+    ## Git履歴コンテキスト
+    {history}
+
+    ## 提案形式
+    - 改善理由を明確に説明
+    - 具体的なコード例を提示
+    - パフォーマンスへの影響を考慮
+    '''
+)
+```
+
+### メモリ使用量の最適化
+
+```yaml
+# docker-compose.yml に追加
+services:
+  app:
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+```
+
+---
+
+## 🔧 マルチプロジェクト対応
+
+### 複数プロジェクトの同時運用
+
+```bash
+# プロジェクトA用の環境設定
+$ cp .env.example .env.projectA
+$ vi .env.projectA
+# PROJECT_PATH=/home/user/projectA
+# CHROMA_COLLECTION=projectA-code
+# PORT_STREAMLIT=8501
+
+# プロジェクトB用の環境設定
+$ cp .env.example .env.projectB
+$ vi .env.projectB
+# PROJECT_PATH=/home/user/projectB
+# CHROMA_COLLECTION=projectB-code
+# PORT_STREAMLIT=8502
+```
+
+```yaml
+# docker-compose.multi.yml（例）
+services:
+  chroma:
+    image: ghcr.io/chroma-core/chroma:0.4.24
+    # 共通のChromaインスタンス
+
+  app-projectA:
+    build: ./app
+    env_file: .env.projectA
+    ports:
+      - "8501:8501"
+
+  app-projectB:
+    build: ./app
+    env_file: .env.projectB
+    ports:
+      - "8502:8501"
+```
+
+### プロジェクト切り替え
+
+```bash
+# 現在のプロジェクトを停止
+$ docker compose down
+
+# 別のプロジェクト設定で起動
+$ docker compose --env-file .env.projectB up
+```
+
+---
+
+## 📊 パフォーマンス監視
+
+### メトリクス確認
+
+```bash
+# インデックスサイズ確認
+$ docker compose exec app python -c "
+import os
+size = sum(os.path.getsize(os.path.join(dirpath, filename))
+          for dirpath, dirnames, filenames in os.walk('/chroma-data')
+          for filename in filenames) / 1024 / 1024
+print(f'Index size: {size:.2f} MB')
+"
+
+# レスポンス時間測定
+$ time curl -s "http://localhost:8501/health" > /dev/null
+```
+
+### ログ分析
+
+```bash
+# エラー率確認
+$ docker compose logs app | grep -c "ERROR"
+
+# 平均処理時間（例）
+$ docker compose logs app | grep "core_chat" | \
+  grep -o "[0-9.]*s" | awk '{sum+=$1; count++} END {print "Average:", sum/count "s"}'
+```
+
+---
+
+## 🧪 開発・デバッグ
+
+### 開発モード起動
+
+```bash
+# ファイル変更の即座反映を確認
+$ docker compose up --build
+# app/ フォルダ内のPythonファイルを編集 → 自動反映
+```
+
+### インタラクティブデバッグ
+
+```bash
+# コンテナ内でPythonシェル起動
+$ docker compose exec app python
+
+>>> from config import cfg
+>>> print(cfg.CHROMA_URL)
+>>> from app_context import retriever, llm
+>>> nodes = retriever.retrieve("test query")
+>>> print(f"Found {len(nodes)} relevant nodes")
+```
+
+### 設定値の動的確認
+
+```bash
+# 全設定値をJSON形式で出力
+$ docker compose exec app python -c "
+from config import cfg
+import json
+print(json.dumps(cfg.dict(), indent=2, default=str))
+"
+```
+
+---
+
+## 🔒 セキュリティ考慮事項
+
+### API キー管理
+
+```bash
+# .env ファイルの権限設定
+$ chmod 600 .env
+
+# Git管理からの除外確認
+$ cat .gitignore | grep "\.env"
+```
+
+### ネットワークセキュリティ
+
+```yaml
+# docker-compose.yml - 外部ネットワーク制限
+services:
+  app:
+    networks:
+      - internal
+  chroma:
+    networks:
+      - internal
+    # 外部公開しない
+
+networks:
+  internal:
+    external: false
+```
+
+### データ永続化の注意点
+
+```bash
+# バックアップ作成
+$ docker run --rm -v gaai00_chroma_data:/data -v $(pwd):/backup \
+  ubuntu tar czf /backup/chroma_backup_$(date +%Y%m%d).tar.gz /data
+
+# バックアップから復元
+$ docker run --rm -v gaai00_chroma_data:/data -v $(pwd):/backup \
+  ubuntu tar xzf /backup/chroma_backup_20250606.tar.gz -C /
+```
+
+---
+
+## 📈 CI/CD 統合
+
+### GitHub Actions での利用
+
+```yaml
+# .github/workflows/ai-code-review.yml
+name: AI Code Review
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup GAAI00
+        run: |
+          cp .env.example .env
+          sed -i 's/PROJECT_PATH=.*/PROJECT_PATH=$(pwd)/' .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          
+      - name: Run AI Analysis
+        run: |
+          docker compose up -d
+          # カスタムスクリプトでPRの変更ファイルを分析
+```
+
+### 継続的品質改善
+
+```bash
+# 定期的なインデックス最適化
+$ docker compose exec app python -c "
+from indexer import build_full_index
+build_full_index()  # 週次実行推奨
+"
+
+# ログローテーション
+$ docker compose logs app --since 24h > logs/app_$(date +%Y%m%d).log
+```
+
+---
+
+## 🆘 サポート・コミュニティ
+
+### 問題報告
+
+1. **GitHub Issues**: [https://github.com/Y-Kato/GAAI00/issues](https://github.com/Y-Kato/GAAI00/issues)
+2. **ログ情報の添付**: `docker compose logs app` の出力
+3. **環境情報**: `.env.example` からの差分（API キーは除く）
+
+### 機能リクエスト
+
+- **Discussions**: アイデア・提案の共有
+- **Pull Requests**: 実装済み機能の貢献
+- **Documentation**: 使用例・ベストプラクティスの共有
+
+### 関連リソース
+
+| リソース | URL | 内容 |
+|----------|-----|------|
+| **公式ドキュメント** | [GitHub Wiki](https://github.com/Y-Kato/GAAI00/wiki) | 詳細ガイド・FAQ |
+| **設計資料** | [`docs/`](../docs/) | アーキテクチャ・拡張計画 |
+| **CHANGELOG** | [`CHANGELOG.md`](../CHANGELOG.md) | バージョン履歴 |
+| **ライセンス** | [`LICENSE`](../LICENSE) | MIT License |
+
+---
+
+## 🎓 学習リソース
+
+### LlamaIndex + LangChain 理解
+
+1. **LlamaIndex Tutorials**: [https://docs.llamaindex.ai/en/stable/getting_started/starter_example.html](https://docs.llamaindex.ai/en/stable/getting_started/starter_example.html)
+2. **LangChain Guides**: [https://python.langchain.com/docs/get_started/quickstart](https://python.langchain.com/docs/get_started/quickstart)
+3. **Chroma Documentation**: [https://docs.trychroma.com/getting-started](https://docs.trychroma.com/getting-started)
+
+### 実践的なプロンプトエンジニアリング
+
+```text
+効果的な質問例:
+
+📝 コードレビュー:
+「このPythonクラスの設計を改善し、SOLID原則に準拠させてください」
+
+🔍 バグ特定:
+「このJavaScript関数でメモリリークが発生する可能性を調べてください」
+
+⚡ パフォーマンス最適化:
+「このSQLクエリのボトルネックを特定し、最適化案を提示してください」
+
+🛡️ セキュリティ検証:
+「このWeb APIエンドポイントの脆弱性を分析してください」
+```
+
+---
+
+**更新履歴**: 本ドキュメントは v0.2.0 時点での新アーキテクチャに基づいています。最新情報は [CHANGELOG.md](../CHANGELOG.md) をご確認ください。

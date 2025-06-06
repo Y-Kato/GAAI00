@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-
-# Git リポジトリが “dubious ownership” で止まる場合読み取り専用マウントでも許可
+# Git “dubious ownership” 回避
 git config --global --add safe.directory "$PROJECT_DIR" || true
-echo "[run.sh] PORT_CHROMA=$PORT_CHROMA"
 set -euo pipefail
 
-# 1️⃣  Kick off background file‑watcher for incremental updates
+echo "[run.sh] UI_MODE=${UI_MODE}"
+
+# ① ファイルウォッチャをバックグラウンドで起動
 python watcher.py &
 
-# 2️⃣  Launch UI (defaults to Streamlit)
+# ② UI 起動
 if [ "$UI_MODE" = "gradio" ]; then
+  # Gradio は通常の Python 実行で OK
   python main.py --ui gradio
 else
-  streamlit run main.py --server.port 8501 -- --ui streamlit
+  # Streamlit は公式 CLI で起動する
+  streamlit run ui_streamlit.py --server.port "$PORT_STREAMLIT"
 fi
