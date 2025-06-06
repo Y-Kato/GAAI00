@@ -23,6 +23,11 @@ services:
       - chroma_data:${CHROMA_DATA_DIR}
     ports:
       - "${PORT_CHROMA}:${PORT_CHROMA}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "300k"
+        max-file: "5"
 
   app:
     build: ./app
@@ -40,6 +45,11 @@ services:
     ports:
       - "${PORT_STREAMLIT}:${PORT_STREAMLIT}" # Streamlit
       - "${PORT_GRADIO}:${PORT_GRADIO}" # Gradio
+    logging:
+      driver: json-file
+      options:
+        max-size: "300k"
+        max-file: "5"
 
 volumes:
   chroma_data:

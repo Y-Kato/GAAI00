@@ -5,34 +5,66 @@
 
 ---
 
-## \[0.2.0] – 2025-06-05
+## [0.2.0] - 2025-06-06
 
-### 追加された機能
+### 🚀 大規模リファクタリング
 
-* `.env` を中心とした完全な設定管理構成に移行し、`config.py` に集約。
-* 新規環境変数の追加：`CHROMA_HOST`, `PORT_CHROMA`, `CHROMA_DATA_DIR`, `CHROMA_COLLECTION`, `PORT_STREAMLIT`, `PORT_GRADIO`, `UI_MODE`, `EMBEDDING_PROVIDER`。
-* `watcher.py` によるインクリメンタルなインデックス更新機構を追加。
-* UI 切り替え（Streamlit / Gradio）を `.env` 経由で動的選択可能に。
-* README / usage / project-structure / plan-multi-project などドキュメントを全面刷新。
+**アーキテクチャの完全分離**
+* **単一責任化**: UI層、ビジネスロジック層、インフラ層を完全分離
+* **テスタビリティ向上**: `core_chat.answer()` 関数が retriever/llm をDI可能に
+* **UI拡張性**: 新UIは `ChatSession` を呼ぶだけで追加可能
 
-### 変更された点
+**新しいモジュール構成**
+* `app_context.py`: グローバルなretriever/llm初期化
+* `chat_session.py`: セッション管理層（履歴保持等）
+* `core_chat.py`: ビジネスロジック（検索→プロンプト生成→LLM呼び出し）
+* `ui_streamlit.py`: Streamlit UI専用モジュール
+* `ui_gradio.py`: Gradio UI専用モジュール
 
-* 旧 `utils.py` を廃止し、**Pydantic ベースの `config.py`** に移行。
-* Docker ビルド構成を簡素化し、実行スクリプトを `run.sh` に集約。
+**設定管理の改善**
+* Pydantic Settings による型安全な設定管理
+* `.env` からの自動読み込みと検証
+* 設定プロパティの動的生成（`CHROMA_URL`等）
 
-### 削除された点
+### 🔧 追加された機能
 
-* ハードコードされたパスや環境依存処理。
+* **エラーハンドリング強化**: 各モジュールで適切な例外処理を追加
+* **ログ出力改善**: 初期化プロセスの可視化とデバッグ情報充実
+* **型安全性**: Pydantic による設定値の型検証
 
-### マイグレーション手順
+### 🔄 変更された点
 
-1. 新しい `.env.example` を参照し、既存 `.env` を置き換えまたは統合してください。
-2. アップグレード後は `docker compose build --no-cache` を推奨。
-3. CI での `.env.ci` に `PORT_STREAMLIT`, `PORT_GRADIO` を追加してください。
+* **config.py**: Pydantic Settingsベースに全面書き換え
+* **main.py**: CLI エントリーポイントを簡素化
+* **run.sh**: UI起動ロジックを Streamlit CLI 呼び出しに統一
+* **requirements.txt**: `pydantic-settings>=2.0.0` を追加
+
+### 🗑️ 削除・廃止
+
+* `main_old.py`: 旧実装をアーカイブ化
+* インラインのハードコーディング値を全廃
+* 重複する LlamaIndex 設定コードを統合
+
+### 💡 今後の拡張ポイント
+
+* `core_chat` 各関数への pytest 導入準備完了
+* LangChain Agent 化のためのDI（依存性注入）基盤完成
+* retriever の search_kwargs .env変数化による柔軟なチューニング対応
+
+### 🧪 CI/CD改善
+
+* `.env.example` の完全性チェック強化
+* Docker multi-stage build 最適化検討
+
+### 📋 マイグレーション手順
+
+1. 既存の `.env` ファイルを `.env.example` と比較し、新しい変数を追加
+2. `docker compose build --no-cache` で依存関係を再構築
+3. `docker compose up` で新アーキテクチャを起動
 
 ---
 
-## \[0.1.0] - 2025-05-30
+## [0.1.0] - 2025-05-30
 
 ### 初期リリース
 
@@ -52,11 +84,14 @@
 ### CI/CD
 
 * GitHub Actions による CI ワークフローを導入（`.github/workflows/main.yml`）
-
   * Python構文チェック（compileall）
   * Docker Compose のビルド確認
 * `README.md` に CIバッジ、Last Commitバッジ、Licenseバッジを追加
 
 ---
 
-次のバージョンでは、DockerHub連携を検討中
+**次期バージョン予定**:
+- [x] アーキテクチャ分離 (v0.2.0)
+- [ ] LangChain Agent 機能 (v0.3.0)
+- [ ] マルチプロジェクト対応 (v0.4.0)
+- [ ] DockerHub連携 (v1.0.0)

@@ -1,9 +1,8 @@
-"""Full & partial indexing of the mounted project into Chroma via LlamaIndex."""
 from pathlib import Path
-from typing import Sequence, List
+from typing import List
 from urllib.parse import urlparse
-from config import PROJECT_DIR, CHROMA_COLLECTION, CHROMA_URL, CHROMA_PERSIST_DIR, INDEXED_FLAG_FILE
 
+from config import cfg
 from llama_index.core import (
     SimpleDirectoryReader,
     VectorStoreIndex,
@@ -12,58 +11,60 @@ from llama_index.core import (
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from chromadb import HttpClient
 
-# --- vector store -----------------------------------------------------------
-
 def _get_vs():
-    url = urlparse(CHROMA_URL)
-    print(f"[INDEXER] Using CHROMA_URL: {CHROMA_URL}, host: {url.hostname}, port: {url.port}")
+    url = urlparse(cfg.CHROMA_URL)
+    print(f"[INDEXER] Using CHROMA_URL: {cfg.CHROMA_URL}, host: {url.hostname}, port: {url.port}")
 
     client = HttpClient(host=url.hostname, port=url.port)
 
     try:
-        collection = client.get_or_create_collection(name=CHROMA_COLLECTION)
+        collection = client.get_or_create_collection(name=cfg.CHROMA_COLLECTION)
     except Exception as e:
         if "already exists" in str(e):
             print(f"[WARN] Collection already exists. Retrieving instead.")
-            collection = client.get_collection(name=CHROMA_COLLECTION)
+            collection = client.get_collection(name=cfg.CHROMA_COLLECTION)
         else:
             raise
 
     return ChromaVectorStore(
         chroma_collection=collection,
-        collection_name=CHROMA_COLLECTION,
-        persist_dir=str(CHROMA_PERSIST_DIR),
+        collection_name=cfg.CHROMA_COLLECTION,
+        persist_dir=str(cfg.CHROMA_PERSIST_DIR),
         host=url.hostname,
         port=url.port
     )
 
 def build_full_index() -> VectorStoreIndex:
-    docs = SimpleDirectoryReader(str(PROJECT_DIR)).load_data()
+    print("[INDEXER] 🟡 build_full_index START")
+    print(f"[INDEXER] 📁 PROJECT_DIR = {cfg.PROJECT_DIR}")
+    print(f"[INDEXER] 📄 Listing files in PROJECT_DIR:")
+    for f in Path(cfg.PROJECT_DIR).rglob("*"):
+        print("   -", f)
+    print("[INDEXER] 🗂️ Full index build started.")
+    docs = SimpleDirectoryReader(str(cfg.PROJECT_DIR)).load_data()
+    print(f"[INDEXER] ✅ Loaded {len(docs)} documents.")
+
     vs = _get_vs()
     index = VectorStoreIndex.from_documents(docs, storage_context=StorageContext.from_defaults(vector_store=vs))
-    index.storage_context.persist()
+    index.storage_context.persist(persist_path=str(cfg.CHROMA_PERSIST_DIR))
+    print("[INDEXER] 📦 Index persisted.")
     return index
-
-# ---------------------------------------------------------------------------
-
-# 🤏 **Partial update** when a subset of files changed -----------------------
 
 def _list_changed_files(last_commit: str) -> List[Path]:
     import git
 
-    repo = git.Repo(str(PROJECT_DIR))
+    repo = git.Repo(str(cfg.PROJECT_DIR))
     diff = repo.git.diff("--name-only", last_commit, "HEAD").splitlines()
-    return [PROJECT_DIR / p for p in diff if (PROJECT_DIR / p).is_file()]
-
+    return [cfg.PROJECT_DIR / p for p in diff if (cfg.PROJECT_DIR / p).is_file()]
 
 def incremental_update():
     import git
 
-    repo = git.Repo(str(PROJECT_DIR))
+    repo = git.Repo(str(cfg.PROJECT_DIR))
     head = repo.head.commit.hexsha
 
-    if INDEXED_FLAG_FILE.exists():
-        last_commit = INDEXED_FLAG_FILE.read_text().strip()
+    if cfg.INDEXED_FLAG_FILE.exists():
+        last_commit = cfg.INDEXED_FLAG_FILE.read_text().strip()
         if last_commit == head:
             return  # nothing new
         changed = _list_changed_files(last_commit)
@@ -71,7 +72,7 @@ def incremental_update():
         changed = []
 
     if not changed:
-        docs = []  # just commit metadata maybe
+        docs = []
     else:
         reader = SimpleDirectoryReader(input_files=[str(p) for p in changed])
         docs = reader.load_data()
@@ -79,6 +80,6 @@ def incremental_update():
     if docs:
         vs = _get_vs()
         VectorStoreIndex.from_documents(docs, storage_context=StorageContext.from_defaults(vector_store=vs))
-        vs.persist()
+        vs.persist(persist_path=str(cfg.CHROMA_PERSIST_DIR))
 
-    INDEXED_FLAG_FILE.write_text(head)
+    cfg.INDEXED_FLAG_FILE.write_text(head)
