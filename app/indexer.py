@@ -46,8 +46,11 @@ def build_full_index() -> VectorStoreIndex:
 
     vs = _get_vs()
     index = VectorStoreIndex.from_documents(docs, storage_context=StorageContext.from_defaults(vector_store=vs))
-    index.storage_context.persist(persist_path=str(cfg.CHROMA_PERSIST_DIR))
-    print("[INDEXER] 📦 Index persisted.")
+    
+    # 🔥 重要: ローカルストレージへの保存を削除
+    # index.storage_context.persist()  # ← この行を削除（Chromaのみ使用）
+    
+    print("[INDEXER] 📦 Index built and stored in Chroma (no local storage).")
     return index
 
 def _list_changed_files(last_commit: str) -> List[Path]:
@@ -80,6 +83,8 @@ def incremental_update():
     if docs:
         vs = _get_vs()
         VectorStoreIndex.from_documents(docs, storage_context=StorageContext.from_defaults(vector_store=vs))
-        vs.persist(persist_path=str(cfg.CHROMA_PERSIST_DIR))
+        # 🔥 重要: ローカルストレージへの保存を削除
+        # vs.persist()  # ← この行を削除（Chromaが自動保存）
 
     cfg.INDEXED_FLAG_FILE.write_text(head)
+    

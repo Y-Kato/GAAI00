@@ -1,14 +1,29 @@
+
+# LlamaIndex Core & Extensions
 llama-index-core==0.10.39
 llama-index-embeddings-openai==0.1.5
-llama-index-readers-file
+llama-index-readers-file==0.1.4
 llama-index-vector-stores-chroma==0.1.4
+
+# LangChain Fixed Versions (2025-06-06 tested)
 langchain==0.1.14
 langchain-community==0.0.30
+langchain-openai==0.1.6
+
+# Vector Database
 chromadb[server]==0.4.24
+
+# UI Frameworks
 streamlit==1.33.0
 gradio==4.15.0
+
+# File Monitoring & Git
 watchdog==3.0.0
 gitpython==3.1.43
-pydantic-settings>=2.0.0
+
+# Configuration Management
+pydantic-settings==2.2.1
 python-dotenv==1.0.1
+
+# Web Server
 uvicorn==0.28.0
